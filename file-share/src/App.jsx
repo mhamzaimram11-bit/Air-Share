@@ -1,17 +1,20 @@
-import React from "react";
-import Header from "./components/Header";
-import TextShareForm from "./components/TextShareForm";
-import "./App.css";
-import About from "./components/TextFormDetail";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import FromShare from "./pages/share";
+import StaticFrom from "./pages/form";
+import FeedbackPage from "./pages/feedback";
 
-export default function App() {
+function App() {
   return (
-    <div className="site-wrapper">
-      <Header />
-      <div className="container">
-        {/* <TextShareForm /> */}
-        <About />
-      </div>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Navigate to="/share" replace />} />
+        <Route path="/share" element={<FromShare />} />
+        <Route path="/about" element={<StaticFrom />} />
+        <Route path="/feedback" element={<FeedbackPage />} />
+         <Route path="*" element={<Navigate to="/share" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
-};
+}
+
+export default App;

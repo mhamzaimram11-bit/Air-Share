@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from "react";
 import socket from "../socket";
 
-
-
 export default function TextShareForm() {
   const [text, setText] = useState("");
   const [userIP, setUserIP] = useState(null);
@@ -90,7 +88,13 @@ export default function TextShareForm() {
           </button>
         )}
         <button className="btn" type="submit" disabled={!text.trim()}>
-          {mode === "copied" ? "Copied!" : mode === "saving..." ? "Saving..." : mode === "copy" ? "Copy" : "Save"}
+          {mode === "copied"
+            ? "Copied!"
+            : mode === "saving..."
+            ? "Saving..."
+            : mode === "copy"
+            ? "Copy"
+            : "Save"}
         </button>
       </div>
     </form>

@@ -15,7 +15,7 @@ export default function Header() {
       <a href="/" className="header__logo">
         <img
           className="desktop"
-          src="https://airforshare.com/assets/img/logo.svg"
+          src="/logo.png"
           alt="logo"
         />
       </a>

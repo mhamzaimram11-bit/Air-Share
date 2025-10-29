@@ -6,7 +6,7 @@ export default function About() {
     <div class="about" bis_skin_checked="1">
       <h2 class="title">How it works</h2>
       <p class="about__text">
-        AirForShare (AFS) is easy solution to share files, text and links within
+        Air Share (AS) is easy solution to share files, text and links within
         the same Wi-Fi Network.
       </p>
       <ul class="about__steps">
