@@ -3,7 +3,7 @@ import Menu from "./menu.jsx";
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [active, setActive] = useState(window.location.pathname);
+  const [active, setActive] = useState(false);
 
   useEffect(() => {
     const path = window.location.pathname;
@@ -21,7 +21,7 @@ export default function Header() {
       </a>
 
       <div
-        className={`nav-toggle ${menuOpen ? "active" : ""}`}
+        className={`nav-toggle ${menuOpen ? "false" : ""}`}
         onClick={() => setMenuOpen(!menuOpen)}
       >
         <span></span>

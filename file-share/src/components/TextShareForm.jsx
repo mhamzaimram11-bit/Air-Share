@@ -9,6 +9,7 @@ export default function TextShareForm() {
 
   useEffect(() => {
     const registerIP = async () => {
+      //  4220171470471
       try {
         const res = await fetch("https://api.ipify.org?format=json");
         const data = await res.json();
