@@ -241,7 +241,7 @@
   //   );
   // }
 
-  import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import socket from "../socket";
 
 export default function About() {
@@ -343,7 +343,6 @@ export default function About() {
     setError("");
   };
 
-  // Revoke object URLs on cleanup to prevent memory leaks
   useEffect(() => {
     return () => {
       files.forEach((file) => URL.revokeObjectURL(file));
@@ -412,11 +411,12 @@ export default function About() {
                       >
                         {isImage ? (
                           <img
-                            src={fileURL}
+                           src={fileURL}
                             alt={file.name}
                             style={{
+                              // maxWidth: "100%",
                               maxHeight: "100%",
-                              objectFit: "cover",
+                              objectFit: "cover"
                             }}
                           />
                         ) : (
@@ -425,13 +425,13 @@ export default function About() {
                       </div>
                       <div
                         style={{
-                          padding: "8px",
+                          
                           fontSize: "0.9rem",
                           color: "#333",
                           background: "#fafafa",
                         }}
                       >
-                        {file.name}
+                        
                       </div>
                     </div>
                   );
