@@ -3,7 +3,7 @@ import React, { useState } from "react";
 export default function Feedback() {
   const [text, setText] = useState("");
   const [email, setEmail] = useState("");
-  const [mode, setMode] = useState("idle"); // idle | sending | done
+  const [mode, setMode] = useState("idle");
 
   const handleSubmit = (e) => {
     e.preventDefault();

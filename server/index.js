@@ -1,119 +1,19 @@
-// require("dotenv").config();
-// const express = require("express");
-// const path = require("path");
-// const http = require("http");
-// const fs = require("fs").promises;
-// const { Server } = require("socket.io");
-// const cleanup = require("./cleanup");
-// const fsExtra = require("fs-extra");
-
-// const app = express();
-// const server = http.createServer(app);
-// const io = new Server(server);
-
-// const PORT = process.env.PORT || 3000;
-// const DATA_DIR = path.join(__dirname, "data");
-
-// fsExtra.ensureDirSync(DATA_DIR);
-
-// const clients = new Map();
-
-// app.use(express.json());
-
-// const clientBuildPath = path.join(__dirname, "../build");
-// app.use(express.static(clientBuildPath));
-
-// app.get("/latest/:ip", async (req, res) => {
-//   const ip = req.params.ip;
-//   if (!ip || typeof ip !== "string")
-//     return res.status(400).json({ message: "Invalid IP" });
-
-//   const filePath = path.join(DATA_DIR, `${ip.replace(/\./g, "_")}.txt`);
-//   try {
-//     const text = await fs.readFile(filePath, "utf8");
-//     res.json({ text });
-//   } catch {
-//     res.json({ text: "" });
-//   }
-// });
-
-// io.on("connection", (socket) => {
-//   console.log("🟢 Connected:", socket.id);
-
-//   socket.on("registerIP", async (ip) => {
-//     if (!ip || typeof ip !== "string") {
-//       socket.emit("errorMsg", "Invalid IP detected.");
-//       return;
-//     }
-
-//     clients.set(socket.id, { ip });
-//     console.log(`✅ Registered IP for ${socket.id}: ${ip}`);
-
-//     const filePath = path.join(DATA_DIR, `${ip.replace(/\./g, "_")}.txt`);
-//     try {
-//       const text = await fs.readFile(filePath, "utf8");
-//       socket.emit("newText", text);
-//     } catch {
-//       socket.emit("newText", "");
-//     }
-//   });
-
-//   socket.on("shareText", async (text) => {
-//     const sender = clients.get(socket.id);
-//     if (!sender || !sender.ip) return;
-
-//     const ipSafe = sender.ip.replace(/\./g, "_");
-//     const filePath = path.join(DATA_DIR, `${ipSafe}.txt`);
-//     try {
-//       await fs.writeFile(filePath, text, "utf8");
-//     } catch (err) {
-//       console.error("❌ Error saving text:", err);
-//     }
-
-//     clients.forEach((client, id) => {
-//       if (client.ip === sender.ip) io.to(id).emit("newText", text);
-//     });
-//   });
-
-//   socket.on("disconnect", () => {
-//     const info = clients.get(socket.id);
-//     if (info) console.log(`🔴 ${socket.id} (IP: ${info.ip}) disconnected`);
-//     clients.delete(socket.id);
-//   });
-// });
-
-// setInterval(() => cleanup(DATA_DIR), 30 * 60 * 1000);
-
-// app.use((req, res) => {
-//   res.sendFile(path.join(clientBuildPath, "index.html"));
-// });
-// server.listen(PORT, () => {
-//   console.log(`🚀 Server running at http://localhost:${PORT}`);
-//   console.log(`📁 Data directory: ${DATA_DIR}`);
-// });
-
-require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const http = require("http");
 const fs = require("fs").promises;
-const { Server } = require("socket.io");
-const cleanup = require("./cleanup");
 const fsExtra = require("fs-extra");
-
-
-// ✅ Added: Multer for file uploads
+const { Server } = require("socket.io");
 const multer = require("multer");
+const { cleanupOldFiles, clearAllFiles } = require("./cleanup");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.join(__dirname, "data");
-
-// ✅ Added: Upload directory for files
 const UPLOAD_DIR = path.join(__dirname, "uploads");
+
 fsExtra.ensureDirSync(DATA_DIR);
 fsExtra.ensureDirSync(UPLOAD_DIR);
 
@@ -121,71 +21,91 @@ const clients = new Map();
 
 app.use(express.json());
 
-// ✅ Serve frontend build
 const clientBuildPath = path.join(__dirname, "../build");
+
 app.use(express.static(clientBuildPath));
 
-// ✅ Configure Multer storage for uploaded files
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const ip = req.body.ip?.replace(/\./g, "_");
-    if (!ip) return cb(new Error("Missing IP"));
-    const userDir = path.join(UPLOAD_DIR, ip);
-    fsExtra.ensureDirSync(userDir);
-    cb(null, userDir);
+    // Get IP from header
+    const rawIP = req.headers["x-user-ip"];
+    if (!rawIP) return cb(new Error("Missing IP"));
+
+    const safeIP = rawIP.replace(/\./g, "_");
+    const dir = path.join(UPLOAD_DIR, safeIP);
+    fsExtra.ensureDirSync(dir);
+    cb(null, dir);
   },
   filename: (req, file, cb) => {
-    const unique = Date.now() + "-" + file.originalname;
-    cb(null, unique);
+    cb(null, Date.now() + "-" + file.originalname);
   },
 });
-const upload = multer({ storage });
 
-// ✅ REST route to get latest shared text
+const upload = multer({ storage }).single("file");
+
+// API TO GET LATEST TEXT AND FILES
 app.get("/latest/:ip", async (req, res) => {
   const ip = req.params.ip;
   if (!ip || typeof ip !== "string")
     return res.status(400).json({ message: "Invalid IP" });
 
-  const filePath = path.join(DATA_DIR, `${ip.replace(/\./g, "_")}.txt`);
+  const safeIP = ip.replace(/\./g, "_");
+  const textFilePath = path.join(DATA_DIR, `${safeIP}.txt`);
+  const userUploadDir = path.join(UPLOAD_DIR, safeIP);
+
+  let text = "";
+  let files = [];
+
   try {
-    const text = await fs.readFile(filePath, "utf8");
-    res.json({ text });
-  } catch {
-    res.json({ text: "" });
-  }
+    text = await fs.readFile(textFilePath, "utf8");
+  } catch {}
+
+  try {
+    const uploadedFiles = await fs.readdir(userUploadDir);
+    files = uploadedFiles.map((f) => ({
+      name: f,
+      url: `/uploads/${safeIP}/${f}`,
+    }));
+  } catch {}
+
+  res.json({ text, files });
 });
 
-// ✅ New route for file upload (POST /upload)
-app.post("/upload", upload.single("file"), (req, res) => {
-  try {
-    const ip = req.body.ip;
-    if (!ip) return res.status(400).json({ message: "Missing IP" });
+
+//API TO UPLOAD FILES
+app.post("/upload", (req, res) => {
+  upload(req, res, (err) => {
+    if (err) {
+      console.error("❌ Upload error:", err);
+      return res.status(400).json({ success: false, message: err.message });
+    }
+
+    const rawIP = req.headers["x-user-ip"];
+    if (!rawIP)
+      return res.status(400).json({ success: false, message: "Missing IP" });
+
+    const safeIP = rawIP.replace(/\./g, "_");
+    const file = req.file;
 
     const fileInfo = {
-      name: req.file.originalname,
-      size: req.file.size,
-      url: `/uploads/${ip.replace(/\./g, "_")}/${req.file.filename}`,
+      name: file.filename,
+      size: file.size,
+      url: `/uploads/${safeIP}/${file.filename}`,
       time: new Date().toISOString(),
     };
-      console.log("✅ File uploaded:", fileInfo);
 
-    // Broadcast to other clients with same IP
-    clients.forEach((client, id) => {
-      if (client.ip === ip) io.to(id).emit("newFile", fileInfo);
+    console.log("✅ File uploaded:", fileInfo);
+
+    clients.forEach((client, socketId) => {
+      if (client.ip === rawIP) io.to(socketId).emit("newFile", fileInfo);
     });
 
     res.json({ success: true, file: fileInfo });
-  } catch (err) {
-    console.error("❌ File upload error:", err);
-    res.status(500).json({ message: "File upload failed" });
-  }
+  });
 });
 
-// ✅ Serve uploaded files statically
 app.use("/uploads", express.static(UPLOAD_DIR));
 
-// ✅ Socket.io handling for text + file updates
 io.on("connection", (socket) => {
   console.log("🟢 Connected:", socket.id);
 
@@ -198,22 +118,23 @@ io.on("connection", (socket) => {
     clients.set(socket.id, { ip });
     console.log(`✅ Registered IP for ${socket.id}: ${ip}`);
 
-    const filePath = path.join(DATA_DIR, `${ip.replace(/\./g, "_")}.txt`);
+    const safeIP = ip.replace(/\./g, "_");
+
     try {
-      const text = await fs.readFile(filePath, "utf8");
+      const text = await fs.readFile(
+        path.join(DATA_DIR, `${safeIP}.txt`),
+        "utf8"
+      );
       socket.emit("newText", text);
     } catch {
       socket.emit("newText", "");
     }
 
-    // ✅ Send list of previously uploaded files for this IP
-    const ipSafe = ip.replace(/\./g, "_");
-    const userDir = path.join(UPLOAD_DIR, ipSafe);
     try {
-      const files = await fs.readdir(userDir);
+      const files = await fs.readdir(path.join(UPLOAD_DIR, safeIP));
       const fileInfos = files.map((f) => ({
         name: f,
-        url: `/uploads/${ipSafe}/${f}`,
+        url: `/uploads/${safeIP}/${f}`,
       }));
       socket.emit("fileList", fileInfos);
     } catch {
@@ -223,10 +144,10 @@ io.on("connection", (socket) => {
 
   socket.on("shareText", async (text) => {
     const sender = clients.get(socket.id);
-    if (!sender || !sender.ip) return;
+    if (!sender?.ip) return;
 
-    const ipSafe = sender.ip.replace(/\./g, "_");
-    const filePath = path.join(DATA_DIR, `${ipSafe}.txt`);
+    const safeIP = sender.ip.replace(/\./g, "_");
+    const filePath = path.join(DATA_DIR, `${safeIP}.txt`);
     try {
       await fs.writeFile(filePath, text, "utf8");
     } catch (err) {
@@ -238,10 +159,9 @@ io.on("connection", (socket) => {
     });
   });
 
-  // ✅ New socket event for direct file metadata sharing (optional)
   socket.on("shareFileMeta", (fileInfo) => {
     const sender = clients.get(socket.id);
-    if (!sender || !sender.ip) return;
+    if (!sender?.ip) return;
 
     clients.forEach((client, id) => {
       if (client.ip === sender.ip) io.to(id).emit("newFile", fileInfo);
@@ -255,8 +175,27 @@ io.on("connection", (socket) => {
   });
 });
 
-// ✅ Periodic cleanup for old text/files
-setInterval(() => cleanup(DATA_DIR), 30 * 60 * 1000);
+setInterval(() => cleanupOldFiles(UPLOAD_DIR), 30 * 60 * 1000);
+
+//API TO CLEAR ALL FILES FOR A USER
+app.post("/clear-all", async (req, res) => {
+  try {
+    const { ip } = req.body;
+    if (!ip) return res.json({ success: false, message: "Missing IP" });
+
+    const safeIP = ip.replace(/\./g, "_");
+    const userDir = path.join(UPLOAD_DIR, safeIP);
+    // const textFile = path.join(DATA_DIR, `${safeIP}.txt`);
+
+    await clearAllFiles(userDir);
+    // await fs.promises.writeFile(textFile, ""); BUGG
+
+    res.json({ success: true, message: "Files cleared" });
+  } catch (err) {
+    console.error("Clear-all error:", err);
+    res.status(500).json({ success: false, message: "Failed to clear files" });
+  }
+});
 
 app.use((req, res) => {
   res.sendFile(path.join(clientBuildPath, "index.html"));

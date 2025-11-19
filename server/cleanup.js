@@ -1,9 +1,9 @@
 const fs = require("fs").promises;
 const path = require("path");
 
-const EXPIRATION_TIME = 60 * 60 * 1000; // 1 hour
+const EXPIRATION_TIME = 60 * 60 * 1000; 
 
-async function cleanup(directory) {
+async function cleanupOldFiles(directory) {
   try {
     const files = await fs.readdir(directory);
     const now = Date.now();
@@ -22,4 +22,23 @@ async function cleanup(directory) {
   }
 }
 
-module.exports = cleanup;
+
+async function clearAllFiles(directory) {
+  try {
+    const files = await fs.readdir(directory);
+
+    for (const file of files) {
+      const filePath = path.join(directory, file);
+      await fs.unlink(filePath);
+    }
+
+    console.log(`✅ Cleared all files in: ${directory}`);
+  } catch (err) {
+    console.error("Clear all files error:", err);
+  }
+}
+
+module.exports = {
+  cleanupOldFiles,
+  clearAllFiles,
+};

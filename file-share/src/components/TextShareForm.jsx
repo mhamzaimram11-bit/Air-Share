@@ -11,7 +11,7 @@ export default function TextShareForm() {
     const registerIP = async () => {
       //  4220171470471
       try {
-        const res = await fetch("https://api.ipify.org?format=json");
+        const res = await fetch("https://api64.ipify.org?format=json");
         const data = await res.json();
         if (data.ip) {
           setUserIP(data.ip);
@@ -31,6 +31,8 @@ export default function TextShareForm() {
     });
   }, []);
 
+
+  //API CALL TO LOAD LATEST TEXT
   const loadLatestText = async (ip) => {
     try {
       const res = await fetch(`/latest/${ip}`);
@@ -44,6 +46,7 @@ export default function TextShareForm() {
     }
   };
 
+//HANDLE FORM SUBMIT
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!text.trim()) return;
@@ -63,6 +66,7 @@ export default function TextShareForm() {
     }
   };
 
+  //CLEAR TEXT AREA
   const clearText = () => {
     setText("");
     setMode("save");
